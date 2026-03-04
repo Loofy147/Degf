@@ -72,18 +72,18 @@ class HeadProfile:
     head: int
     entropy_series: np.ndarray
     token_cost: float
-    V: float = 0.0
-    C: int = 0
-    G: float = 0.0
+    V: Optional[float] = None
+    C: Optional[int] = None
+    G: Optional[float] = None
     quadrant: str = ""
     intervention: str = ""
 
     def __post_init__(self):
-        if not self.V:
+        if self.V is None:
             self.V = compute_V(self.entropy_series)
-        if not self.C:
+        if self.C is None:
             self.C = count_collapses(self.entropy_series)
-        if not self.G:
+        if self.G is None:
             self.G = compute_G(self.V, self.C)
         if not self.quadrant:
             self.quadrant, self.intervention = classify_quadrant(self.token_cost, self.G)
@@ -178,3 +178,17 @@ class DEGFSimulator:
         scan.targets_genuine_diffuse = filter_genuine_diffuse(scan.profiles)
         scan.targets_mechanical_committed = [(p.layer, p.head) for p in scan.profiles if "Q3" in p.quadrant]
         return scan
+
+def compute_V_detrended(H: np.ndarray, burn_in: int = 10) -> float:
+    """
+    Detrended Entropy Variance.
+    Subtracts expected log growth of entropy to isolate genuine variance.
+    V_detrended = var(H_t - log₂(t+1)) for t >= burn_in
+    """
+    T = len(H)
+    if T < burn_in + 2:
+        return compute_V(H)
+    t_idx = np.arange(T)
+    expected = np.log2(t_idx + 1.0)
+    detrended = H - expected
+    return float(np.var(detrended[burn_in:]))
