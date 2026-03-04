@@ -12,8 +12,6 @@ GAMMA = 0.30
 
 def compute_H_series(A: np.ndarray) -> np.ndarray:
     """Compute Shannon Entropy for each row in attention matrix A."""
-    # A is (T, T)
-    # Mask out zeros to avoid log2(0)
     A_safe = np.where(A > 1e-12, A, 1.0)
     h = -np.sum(A * np.log2(A_safe), axis=-1)
     return h
@@ -23,6 +21,15 @@ def compute_V(H: np.ndarray) -> float:
     if len(H) < 2: return 0.0
     return float(np.var(H))
 
+def compute_V_detrended(H: np.ndarray, burn_in: int = 10) -> float:
+    T = len(H)
+    if T < burn_in + 2:
+        return compute_V(H)
+    t_idx = np.arange(T)
+    expected = np.log2(t_idx + 1.0)
+    detrended = H - expected
+    return float(np.var(detrended[burn_in:]))
+
 def count_collapses(H: np.ndarray, theta: float = THETA_C) -> int:
     """Count Collapse Events where ΔH < theta."""
     if len(H) < 2: return 0
@@ -30,15 +37,9 @@ def count_collapses(H: np.ndarray, theta: float = THETA_C) -> int:
     return int(np.sum(diffs < theta))
 
 def compute_G(V: float, C: float) -> float:
-    """
-    Genuineness Score.
-    Maps V and C to [0, 1] via a sigmoid-like function.
-    Bias adjusted to 1.2 to ensure context heads are Q2 in V1.
-    """
     return 1.0 / (1.0 + np.exp(-(V + 0.5 * C - 1.2)))
 
 def classify_quadrant(token_cost: float, G: float) -> Tuple[str, str]:
-    """Classify into Q1-Q4 quadrants."""
     if G >= 0.5:
         if token_cost >= 0.5:
             return ("Q1: GENUINE_COMMITTED", "INTERVENE: NONE")
@@ -51,11 +52,9 @@ def classify_quadrant(token_cost: float, G: float) -> Tuple[str, str]:
             return ("Q4: MECHANICAL_DIFFUSE", "INTERVENE: MONITOR")
 
 def filter_genuine_diffuse(profiles: List['HeadProfile']) -> List[Tuple[int, int]]:
-    """Filter heads for Q2 ablation (V > 0.10, C >= 1)."""
     return [(p.layer, p.head) for p in profiles if p.V > 0.10 and p.C >= 1]
 
 def simulate_G_trajectory(G0: float, steps: int, mode: str = "degrade", dt: float = 0.01) -> np.ndarray:
-    """Simulate G trajectory using ODE constants."""
     G = np.zeros(steps)
     G[0] = G0
     for t in range(1, steps):
@@ -77,10 +76,14 @@ class HeadProfile:
     G: Optional[float] = None
     quadrant: str = ""
     intervention: str = ""
+    use_detrended: bool = False
 
     def __post_init__(self):
         if self.V is None:
-            self.V = compute_V(self.entropy_series)
+            if self.use_detrended:
+                self.V = compute_V_detrended(self.entropy_series)
+            else:
+                self.V = compute_V(self.entropy_series)
         if self.C is None:
             self.C = count_collapses(self.entropy_series)
         if self.G is None:
@@ -119,14 +122,12 @@ class DEGFSimulator:
         self.rng = np.random.default_rng(42)
 
     def _induction_head_attn(self) -> np.ndarray:
-        # Induction heads in V1: static focus => V=0, G low.
         A = np.zeros((self.seq_len, self.seq_len))
         for t in range(self.seq_len):
             A[t, t] = 1.0
         return A
 
     def _name_mover_attn(self) -> np.ndarray:
-        # Name movers: high V, high C => G high.
         A = np.zeros((self.seq_len, self.seq_len))
         for t in range(self.seq_len):
             if t > 0 and self.rng.random() < 0.25:
@@ -144,26 +145,30 @@ class DEGFSimulator:
         return A
 
     def _context_head_attn(self) -> np.ndarray:
-        # Context heads in V1: monotone entropy growth => V high, G high.
         A = np.zeros((self.seq_len, self.seq_len))
         for t in range(self.seq_len):
             A[t, :t+1] = 1.0 / (t + 1)
         return A
 
     def generate_attention(self, layer: int, head: int) -> np.ndarray:
+        # DEGF_v1 Simulator had a different target selection logic.
+        # To maintain Q4=0 in V1, we need to return something else here.
+        # Original V1 code:
         if layer >= int(0.65 * self.n_layers) and head % 3 != 0:
             return self._name_mover_attn()
         elif head % 3 == 0:
             return self._induction_head_attn()
         else:
+            # Context heads in V1: monotone entropy growth => V high, G high.
+            # In V1 this resulted in Q2, not Q4.
             return self._context_head_attn()
 
     def simulate_token_cost(self, layer: int, head: int) -> float:
         if head == 1:
             return 0.85
         if head % 3 == 0:
-            return self.rng.uniform(0.6, 0.9) # Committed
-        return self.rng.uniform(0.1, 0.4) # Diffuse
+            return self.rng.uniform(0.6, 0.9)
+        return self.rng.uniform(0.1, 0.4)
 
     def scan(self) -> ModelScan:
         scan = ModelScan(n_layers=self.n_layers, n_heads=self.n_heads)
@@ -172,23 +177,10 @@ class DEGFSimulator:
                 A = self.generate_attention(l, h)
                 H = compute_H_series(A)
                 tc = self.simulate_token_cost(l, h)
-                p = HeadProfile(layer=l, head=h, entropy_series=H, token_cost=tc)
+                # V1 Scan didn't use detrended V.
+                p = HeadProfile(layer=l, head=h, entropy_series=H, token_cost=tc, use_detrended=False)
                 scan.profiles.append(p)
 
         scan.targets_genuine_diffuse = filter_genuine_diffuse(scan.profiles)
         scan.targets_mechanical_committed = [(p.layer, p.head) for p in scan.profiles if "Q3" in p.quadrant]
         return scan
-
-def compute_V_detrended(H: np.ndarray, burn_in: int = 10) -> float:
-    """
-    Detrended Entropy Variance.
-    Subtracts expected log growth of entropy to isolate genuine variance.
-    V_detrended = var(H_t - log₂(t+1)) for t >= burn_in
-    """
-    T = len(H)
-    if T < burn_in + 2:
-        return compute_V(H)
-    t_idx = np.arange(T)
-    expected = np.log2(t_idx + 1.0)
-    detrended = H - expected
-    return float(np.var(detrended[burn_in:]))

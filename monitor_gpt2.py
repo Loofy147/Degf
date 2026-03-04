@@ -1,39 +1,49 @@
 import torch
 import numpy as np
 from transformer_lens import HookedTransformer
-from degf_core import compute_H_series, compute_V, compute_V_detrended, compute_G, count_collapses, HeadProfile
+from degf_core import compute_H_series, compute_V, compute_V_detrended, compute_G, count_collapses, HeadProfile, DEGFSimulator
 
-def scan_model(model, prompts):
-    """Scan model across prompts and return list of HeadProfiles."""
+def scan_model_live(model, prompts):
+    """Scan model across prompts using TransformerLens."""
     n_layers = model.cfg.n_layers
     n_heads = model.cfg.n_heads
     profiles = []
 
-    # Simple implementation for benchmarking: use first prompt
-    # and compute profiles for all heads.
-    text = prompts[0]
-    with torch.no_grad():
-        tokens = model.to_tokens(text)
-        _, cache = model.run_with_cache(tokens, remove_batch_dim=True)
+    for text in prompts:
+        with torch.no_grad():
+            tokens = model.to_tokens(text)
+            _, cache = model.run_with_cache(tokens, remove_batch_dim=True)
 
-        # Calculate token costs (surprisals)
-        logits = model(tokens)
-        log_probs = logits[0, :-1, :].log_softmax(dim=-1)
-        labels = tokens[0, 1:]
-        token_log_probs = log_probs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
-        surprisals = -token_log_probs / np.log(2)
-        tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
+            # Calculate token costs (surprisals)
+            logits = model(tokens)
+            log_probs = logits[0, :-1, :].log_softmax(dim=-1)
+            labels = tokens[0, 1:]
+            token_log_probs = log_probs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+            surprisals = -token_log_probs / np.log(2)
+            tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
 
-        for l in range(n_layers):
-            pattern = cache["pattern", l]
-            for h in range(n_heads):
-                attn = pattern[h].cpu().numpy()
-                H = compute_H_series(attn)
-                # HeadProfile token_cost is mean tc for the sequence
-                mean_tc = float(np.mean(tc_normalized))
-                profiles.append(HeadProfile(layer=l, head=h, entropy_series=H, token_cost=mean_tc))
-
+            for l in range(n_layers):
+                pattern = cache["pattern", l]
+                use_detrended = (l < int(0.65 * n_layers))
+                for h in range(n_heads):
+                    attn = pattern[h].cpu().numpy()
+                    H = compute_H_series(attn)
+                    mean_tc = float(np.mean(tc_normalized)) if len(tc_normalized) > 0 else 0.5
+                    profiles.append(HeadProfile(layer=l, head=h, entropy_series=H, token_cost=mean_tc, use_detrended=use_detrended))
     return profiles
+
+def scan_model_sim(n_layers=12, n_heads=12, seq_len=128):
+    """Simulate a model scan."""
+    sim = DEGFSimulator(n_layers, n_heads, seq_len)
+    scan = sim.scan()
+    return scan.profiles
+
+def scan_model(model_or_n_layers, prompts=None):
+    """Router for scanning model."""
+    if isinstance(model_or_n_layers, HookedTransformer):
+        return scan_model_live(model_or_n_layers, prompts)
+    else:
+        return scan_model_sim(n_layers=model_or_n_layers)
 
 class DEGFMonitor:
     def __init__(self, model):
@@ -68,10 +78,11 @@ class DEGFMonitor:
                 all_G = []
                 for l in range(self.n_layers):
                     pattern = cache["pattern", l]
+                    use_detrended = (l < int(0.65 * self.n_layers))
                     for h in range(self.n_heads):
                         attn_full = pattern[h, :t+1, :t+1].cpu().numpy()
                         H_series = compute_H_series(attn_full)
-                        is_context = l < int(0.65 * self.n_layers); V = compute_V_detrended(H_series) if is_context else compute_V(H_series)
+                        V = compute_V_detrended(H_series) if use_detrended else compute_V(H_series)
                         C = count_collapses(H_series)
                         G = compute_G(V, C)
                         all_G.append(G)
@@ -91,6 +102,7 @@ class DEGFMonitor:
             return g_stream
 
     def apply_guillotine(self, g_stream, window=5, threshold=-0.20):
+        # FIX-2: Updated window=5, threshold=-0.20
         if len(g_stream) < window:
             return g_stream
 

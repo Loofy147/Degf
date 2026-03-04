@@ -6,22 +6,22 @@ Welcome to the Dynamic Entropy Genuineness Framework (DEGF). This document provi
 
 All metrics are calculated per-head per-token.
 
-### Shannon Entropy ($)
-Measures the 'focus' of an attention head at position $.
-1308H_t = -\sum a_{ti} \log_2(a_{ti})1308
+### Shannon Entropy ($H_t$)
+Measures the 'focus' of an attention head at position $t$.
+$$H_t = -\sum a_{ti} \log_2(a_{ti})$$
 
-### Dynamic Variance ($)
+### Dynamic Variance ($V$)
 Measures how much the head's focus shifts during a sequence.
-1308V = \text{Var}(H_0, \dots, H_T)1308
+$$V = \text{Var}(H_0, \dots, H_T)$$
 
-### Collapse Events ($)
+### Collapse Events ($C$)
 Discrete events where the attention entropy drops sharply, signifying a 'logical click' or commitment.
-1308C = \sum [ \Delta H_t < \theta_c ]1308
+$$C = \sum [ \Delta H_t < \theta_c ]$$
 Default $\theta_c = -0.20$.
 
-### Genuineness Score ($)
-A sigmoid mapping of $ and $ to 1$.
-1308G = \sigma(V + 0.5 \cdot C - 1.2)1308
+### Genuineness Score ($G$)
+A sigmoid mapping of $V$ and $C$ to $[0, 1]$.
+$$G = \sigma(V + 0.5 \cdot C - 1.2)$$
 
 ## 2. API Reference
 
@@ -57,12 +57,12 @@ logits = sgs2_model("Reason about this...") # Triggers Phase Gate recurrence
 ## 3. Configuration
 
 Key constants can be found in `degf_core.py`:
-- `K_DEG`: Rate of genuineness degradation (-bash.8129$).
-- `K_REC`: Rate of genuineness recovery (.2371$).
-- `THETA_C`: Collapse threshold (himBHs0.20$).
+- `K_DEG`: Rate of genuineness degradation (0.8129).
+- `K_REC`: Rate of genuineness recovery (1.2371).
+- `THETA_C`: Collapse threshold (-0.20).
 
 ## 4. Calibration
 
-The himBHsscore is calibrated against reasoning quality using the following formula (IMP-4):
-1308\hat{Q} = 0.802 \cdot G - 0.113 \cdot tc + 0.1451308
-where $ is the normalized token cost (surprisal).
+The G-score is calibrated against reasoning quality using the following formula (IMP-4):
+$$\hat{Q} = 0.802 \cdot G - 0.113 \cdot tc + 0.145$$
+where $tc$ is the normalized token cost (surprisal).
