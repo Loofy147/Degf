@@ -1,33 +1,47 @@
 # DEGF: Dynamic Entropy Genuineness Framework
 
-This repository contains the reference implementation of the Dynamic Entropy Genuineness Framework (DEGF), as specified in the research papers.
+This repository contains the reference implementation of the Dynamic Entropy Genuineness Framework (DEGF), as specified in the research papers. DEGF provides a thermodynamic theory for distinguishing 'genuine' reasoning from 'mechanical' pattern completion in LLMs.
 
-## Key Components
+## Core Features
 
-- **`degf_core.py`**: The core mathematical framework implementing Shannon Entropy ($), Dynamic Variance ($), Collapse Events ($), and the Genuineness Score ($).
-- **`degf_v2.py`**: Advanced improvements including adaptive thresholds, plateau simulators, and cascade detectors.
-- **`monitor_gpt2.py`**: A live reasoning monitor that runs alongside GPT-2 to output a real-time himBHsstream.
-- **`ablation_a3.py`**: Implementation of Milestone A3: The double-dissociation ablation test on GPT-2-small.
+### Track A — The Real-Time Reasoning Monitor
+- **Live G-Stream**: Monitor token-by-token genuine computation (`monitor_gpt2.py`).
+- **Hallucination Early-Warning**: Detected by low $ + low surprisal (high confidence).
+- **Elaboration Guillotine**: Automatic truncation of vacuous responses when $\Delta G$ drops below threshold.
+
+### Track B — Thermodynamic Training Signal
+- **{thermo}$ Loss**: Encourages development of Q2 logic engine heads (`train_thermo.py`).
+- **Emergent Reasoning**: Reward internal thermodynamic signatures of reasoning rather than just output formatting.
+
+### Track C — SGS-2 Architecture Prototype
+- **Decoupled Stream**: Separates reasoning (Latent Reasoner) from formatting (Syntax Decoder) (`sgs2_prototype.py`).
+- **Phase Gate Recurrence**: G-stream controlled recurrence for deep deliberation before emission.
 
 ## Milestone A3 Validation
 
-The DEGF framework has been empirically validated on GPT-2-small:
-- **Ablation Targets**: 35 heads in late layers (L6-L11) with high himBHsscores.
-- **IOI Accuracy Drop**: 100% (Baseline 100% -> Ablated 0%).
-- **Induction Accuracy Drop**: 0% (Baseline 100% -> Ablated 100%).
+The framework has been empirically validated on GPT-2-small:
+- **IOI Accuracy Drop**: 100% when ablating Q2 reasoning heads.
+- **Induction Accuracy Drop**: 0% (mechanical circuits spared).
+- **Double-Dissociation**: Confirmed.
 
-This confirms that the DEGF metrics correctly identify the causal circuits responsible for genuine logical reasoning while sparing mechanical pattern-completion circuits.
+## Usage
 
-## Running Tests
-
-To run the full suite of 107 tests (V1 + V2):
+### Run Tests
 ```bash
 python3 test_degf_v2.py
 ```
 
-## Live Monitoring
+### Run A3 Ablation Test
+```bash
+python3 ablation_a3.py
+```
 
-To monitor a model's himBHsstream:
+### Start Monitor
 ```bash
 python3 monitor_gpt2.py
+```
+
+### SGS-2 Inference Simulation
+```bash
+python3 sgs2_prototype.py
 ```

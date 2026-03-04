@@ -3,58 +3,83 @@ import numpy as np
 from transformer_lens import HookedTransformer
 from degf_core import compute_H_series, compute_V, compute_G, count_collapses, HeadProfile
 
-def scan_model(model, prompts):
-    n_layers = model.cfg.n_layers
-    n_heads = model.cfg.n_heads
-    head_history = {(l, h): [] for l in range(n_layers) for h in range(n_heads)}
+class DEGFMonitor:
+    def __init__(self, model):
+        self.model = model
+        self.n_layers = model.cfg.n_layers
+        self.n_heads = model.cfg.n_heads
 
-    for prompt in prompts:
-        tokens = model.to_tokens(prompt)
-        logits, cache = model.run_with_cache(tokens, remove_batch_dim=True)
-        for l in range(n_layers):
-            pattern = cache["pattern", l]
-            for h in range(n_heads):
-                attn = pattern[h].cpu().numpy()
-                H = compute_H_series(attn)
-                p = HeadProfile(layer=l, head=h, entropy_series=H, token_cost=0.5)
-                head_history[(l, h)].append(p)
+    def compute_quality(self, G, tc):
+        return 0.802 * G - 0.113 * tc + 0.145
 
-    averaged_profiles = []
-    for (l, h), profiles in head_history.items():
-        avg_V = np.mean([p.V for p in profiles])
-        avg_C = np.mean([p.C for p in profiles])
-        avg_G = np.mean([p.G for p in profiles])
-        rep = HeadProfile(layer=l, head=h, entropy_series=profiles[0].entropy_series, token_cost=0.5)
-        object.__setattr__(rep, 'V', avg_V)
-        object.__setattr__(rep, 'C', avg_C)
-        object.__setattr__(rep, 'G', avg_G)
-        averaged_profiles.append(rep)
+    def monitor_step(self, text):
+        with torch.no_grad():
+            tokens = self.model.to_tokens(text)
+            logits, cache = self.model.run_with_cache(tokens, remove_batch_dim=True)
 
-    return averaged_profiles
+            if logits.ndim == 3:
+                logits = logits[0]
+
+            seq_len = tokens.shape[1]
+            g_stream = []
+
+            log_probs = logits.log_softmax(dim=-1)
+            labels = tokens[0, 1:]
+            token_log_probs = log_probs[:-1, :].gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+            surprisals = -token_log_probs / np.log(2)
+            tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
+
+            for t in range(seq_len):
+                token_str = self.model.to_string(tokens[0, t])
+                tc = float(tc_normalized[t-1]) if t > 0 else 0.5
+
+                all_G = []
+                for l in range(self.n_layers):
+                    pattern = cache["pattern", l]
+                    for h in range(self.n_heads):
+                        attn_full = pattern[h, :t+1, :t+1].cpu().numpy()
+                        H_series = compute_H_series(attn_full)
+                        V = compute_V(H_series)
+                        C = count_collapses(H_series)
+                        G = compute_G(V, C)
+                        all_G.append(G)
+
+                mean_G = float(np.mean(all_G))
+                quality = self.compute_quality(mean_G, tc)
+                hallucination_risk = "HIGH" if mean_G < 0.3 and tc < 0.3 else "LOW"
+
+                g_stream.append({
+                    "token": token_str,
+                    "G": mean_G,
+                    "tc": tc,
+                    "Q": quality,
+                    "hallucination_risk": hallucination_risk
+                })
+
+            return g_stream
+
+    def apply_guillotine(self, g_stream, window=3, threshold=-0.05):
+        if len(g_stream) < window:
+            return g_stream
+
+        for i in range(window, len(g_stream)):
+            delta_G = g_stream[i]["G"] - g_stream[i-window]["G"]
+            if delta_G < threshold:
+                print(f"\n[Guillotine] Truncating at token '{g_stream[i]['token']}' (delta G: {delta_G:.3f})")
+                return g_stream[:i+1]
+        return g_stream
 
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = HookedTransformer.from_pretrained("gpt2-small", device=device)
-    prompts = [
-        "When John and Mary went to the store, John gave a drink to Mary",
-        "After Alice and Bob finished lunch, Alice gave a book to Bob",
-        "The quick brown fox jumps over the lazy dog",
-        "1 2 3 1 2 3",
-        "A B C A B C"
-    ]
-    profiles = scan_model(model, prompts)
 
-    # Q2 targets: High G, Late layers (>= 6)
-    q2_targets = [p for p in profiles if p.G > 0.5 and p.layer >= 6]
+    monitor = DEGFMonitor(model)
+    prompt = "If all men are mortal and Socrates is a man, then Socrates is mortal. This is an example of a syllogism."
+    g_stream = monitor.monitor_step(prompt)
 
-    # If too many, take top G
-    if len(q2_targets) > 36:
-        q2_targets = sorted(q2_targets, key=lambda x: -x.G)[:36]
+    print(f"{'Token':<15} | {'G-score':<8} | {'Quality':<8} | {'Risk':<5}")
+    print("-" * 50)
+    for entry in g_stream:
+        print(f"{entry['token']:<15} | {entry['G']:.4f} | {entry['Q']:.4f} | {entry['hallucination_risk']}")
 
-    print(f"Identified {len(q2_targets)} Q2 targets in late layers.")
-    for p in q2_targets[:10]:
-        print(f"L{p.layer}H{p.head} -> G={p.G:.4f}")
-
-    with open("q2_targets.txt", "w") as f:
-        for p in q2_targets:
-            f.write(f"{p.layer},{p.head}\n")
+    truncated = monitor.apply_guillotine(g_stream)
