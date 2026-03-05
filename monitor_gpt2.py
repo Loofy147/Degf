@@ -127,3 +127,54 @@ if __name__ == "__main__":
         print(f"{entry['token']:<15} | {entry['G']:.4f} | {entry['Q']:.4f} | {entry['hallucination_risk']}")
 
     truncated = monitor.apply_guillotine(g_stream)
+
+class TargetedDEGFMonitor(DEGFMonitor):
+    def __init__(self, model, target_heads):
+        super().__init__(model)
+        self.target_heads = target_heads # List of (layer, head)
+
+    def monitor_step(self, text):
+        with torch.no_grad():
+            tokens = self.model.to_tokens(text)
+            logits, cache = self.model.run_with_cache(tokens, remove_batch_dim=True)
+
+            if logits.ndim == 3:
+                logits = logits[0]
+
+            seq_len = tokens.shape[1]
+            g_stream = []
+
+            log_probs = logits.log_softmax(dim=-1)
+            labels = tokens[0, 1:]
+            token_log_probs = log_probs[:-1, :].gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+            surprisals = -token_log_probs / np.log(2)
+            tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
+
+            for t in range(seq_len):
+                token_str = self.model.to_string(tokens[0, t])
+                tc = float(tc_normalized[t-1]) if t > 0 else 0.5
+
+                all_G = []
+                for l, h in self.target_heads:
+                    pattern = cache["pattern", l]
+                    attn_full = pattern[h, :t+1, :t+1].cpu().numpy()
+                    H_series = compute_H_series(attn_full)
+                    # Q2 targets are in late layers, so no detrending
+                    V = compute_V(H_series)
+                    C = count_collapses(H_series)
+                    G = compute_G(V, C)
+                    all_G.append(G)
+
+                mean_G = float(np.mean(all_G)) if all_G else 0.0
+                quality = self.compute_quality(mean_G, tc)
+                hallucination_risk = "HIGH" if mean_G < 0.3 and tc < 0.3 else "LOW"
+
+                g_stream.append({
+                    "token": token_str,
+                    "G": mean_G,
+                    "tc": tc,
+                    "Q": quality,
+                    "hallucination_risk": hallucination_risk
+                })
+
+            return g_stream
