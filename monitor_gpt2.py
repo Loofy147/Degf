@@ -113,25 +113,21 @@ class DEGFMonitor:
                 return g_stream[:i+1]
         return g_stream
 
-if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = HookedTransformer.from_pretrained("gpt2-small", device=device)
-
-    monitor = DEGFMonitor(model)
-    prompt = "If all men are mortal and Socrates is a man, then Socrates is mortal. This is an example of a syllogism."
-    g_stream = monitor.monitor_step(prompt)
-
-    print(f"{'Token':<15} | {'G-score':<8} | {'Quality':<8} | {'Risk':<5}")
-    print("-" * 50)
-    for entry in g_stream:
-        print(f"{entry['token']:<15} | {entry['G']:.4f} | {entry['Q']:.4f} | {entry['hallucination_risk']}")
-
-    truncated = monitor.apply_guillotine(g_stream)
-
 class TargetedDEGFMonitor(DEGFMonitor):
-    def __init__(self, model, target_heads):
+    def __init__(self, model, target_heads=None):
         super().__init__(model)
         self.target_heads = target_heads # List of (layer, head)
+        if self.target_heads is None:
+            self._discover_targets()
+
+    def _discover_targets(self):
+        """Automatic target discovery using a standard IOI prompt."""
+        print("No target heads provided. Discovering Q2 targets...")
+        prompts = ["When John and Mary went to the store, John gave a drink to Mary"]
+        profiles = scan_model_live(self.model, prompts)
+        # Criteria for Q2: G >= 0.5, V > 0.1, C >= 1, late layers
+        self.target_heads = [(p.layer, p.head) for p in profiles if p.G >= 0.5 and p.V > 0.1 and p.C >= 1 and p.layer >= int(0.5 * self.n_layers)]
+        print(f"Discovered {len(self.target_heads)} Q2 target heads.")
 
     def monitor_step(self, text):
         with torch.no_grad():
@@ -155,18 +151,23 @@ class TargetedDEGFMonitor(DEGFMonitor):
                 tc = float(tc_normalized[t-1]) if t > 0 else 0.5
 
                 all_G = []
+                # Live Cascade Strength Metric
+                # Measures how many target heads are 'clicking' (G > 0.8) simultaneously
+                active_clicks = 0
                 for l, h in self.target_heads:
                     pattern = cache["pattern", l]
                     attn_full = pattern[h, :t+1, :t+1].cpu().numpy()
                     H_series = compute_H_series(attn_full)
-                    # Q2 targets are in late layers, so no detrending
                     V = compute_V(H_series)
                     C = count_collapses(H_series)
                     G = compute_G(V, C)
                     all_G.append(G)
+                    if G > 0.8: active_clicks += 1
 
                 mean_G = float(np.mean(all_G)) if all_G else 0.0
                 quality = self.compute_quality(mean_G, tc)
+                cascade_strength = active_clicks / len(self.target_heads) if self.target_heads else 0.0
+
                 hallucination_risk = "HIGH" if mean_G < 0.3 and tc < 0.3 else "LOW"
 
                 g_stream.append({
@@ -174,7 +175,21 @@ class TargetedDEGFMonitor(DEGFMonitor):
                     "G": mean_G,
                     "tc": tc,
                     "Q": quality,
+                    "cascade_strength": cascade_strength,
                     "hallucination_risk": hallucination_risk
                 })
 
             return g_stream
+
+if __name__ == "__main__":
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = HookedTransformer.from_pretrained("gpt2-small", device=device)
+
+    monitor = DEGFMonitor(model)
+    prompt = "If all men are mortal and Socrates is a man, then Socrates is mortal."
+    g_stream = monitor.monitor_step(prompt)
+
+    print(f"{'Token':<15} | {'G-score':<8} | {'Quality':<8}")
+    print("-" * 40)
+    for entry in g_stream:
+        print(f"{entry['token']:<15} | {entry['G']:.4f} | {entry['Q']:.4f}")
