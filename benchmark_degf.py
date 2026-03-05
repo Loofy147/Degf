@@ -13,7 +13,7 @@ def run_benchmarks(model, name):
     ioi_acc = evaluate_accuracy(model, ioi_data)
     ind_acc = evaluate_accuracy(model, ind_data)
 
-    # Run scan for metrics
+    # Run scan for metrics - scan_model is now robust
     prompts = ["When John and Mary went to the store, John gave a drink to Mary"]
     profiles = scan_model(model, prompts)
 
@@ -38,9 +38,7 @@ if __name__ == "__main__":
     base_model = HookedTransformer.from_pretrained("gpt2-small", device=device)
     base_res = run_benchmarks(base_model, "Baseline GPT-2")
 
-    # 2. Thermo-trained (Simulate by loading previously fine-tuned state if possible,
-    # or just run the benchmarks on the 'model' from the training script if it were kept)
-    # Since we didn't save, we'll run a quick fine-tuning here to show the delta.
+    # 2. Thermo-trained
     from train_thermo import compute_thermo_loss
     import torch.optim as optim
 
