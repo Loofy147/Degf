@@ -20,13 +20,13 @@ def scan_model_live(model, prompts):
             labels = tokens[0, 1:]
             token_log_probs = log_probs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
             surprisals = -token_log_probs / np.log(2)
-            tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
+            tc_normalized = torch.clamp(surprisals.float() / 10.0, 0, 1).cpu().numpy()
 
             for l in range(n_layers):
                 pattern = cache["pattern", l]
                 use_detrended = (l < int(0.65 * n_layers))
                 for h in range(n_heads):
-                    attn = pattern[h].cpu().numpy()
+                    attn = pattern[h].float().cpu().numpy()
                     H = compute_H_series(attn)
                     mean_tc = float(np.mean(tc_normalized)) if len(tc_normalized) > 0 else 0.5
                     profiles.append(HeadProfile(layer=l, head=h, entropy_series=H, token_cost=mean_tc, use_detrended=use_detrended))
@@ -69,7 +69,7 @@ class DEGFMonitor:
             labels = tokens[0, 1:]
             token_log_probs = log_probs[:-1, :].gather(-1, labels.unsqueeze(-1)).squeeze(-1)
             surprisals = -token_log_probs / np.log(2)
-            tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
+            tc_normalized = torch.clamp(surprisals.float() / 10.0, 0, 1).cpu().numpy()
 
             for t in range(seq_len):
                 token_str = self.model.to_string(tokens[0, t])
@@ -80,7 +80,7 @@ class DEGFMonitor:
                     pattern = cache["pattern", l]
                     use_detrended = (l < int(0.65 * self.n_layers))
                     for h in range(self.n_heads):
-                        attn_full = pattern[h, :t+1, :t+1].cpu().numpy()
+                        attn_full = pattern[h, :t+1, :t+1].float().cpu().numpy()
                         H_series = compute_H_series(attn_full)
                         V = compute_V_detrended(H_series) if use_detrended else compute_V(H_series)
                         C = count_collapses(H_series)
@@ -144,7 +144,7 @@ class TargetedDEGFMonitor(DEGFMonitor):
             labels = tokens[0, 1:]
             token_log_probs = log_probs[:-1, :].gather(-1, labels.unsqueeze(-1)).squeeze(-1)
             surprisals = -token_log_probs / np.log(2)
-            tc_normalized = torch.clamp(surprisals / 10.0, 0, 1).cpu().numpy()
+            tc_normalized = torch.clamp(surprisals.float() / 10.0, 0, 1).cpu().numpy()
 
             for t in range(seq_len):
                 token_str = self.model.to_string(tokens[0, t])
@@ -156,7 +156,7 @@ class TargetedDEGFMonitor(DEGFMonitor):
                 active_clicks = 0
                 for l, h in self.target_heads:
                     pattern = cache["pattern", l]
-                    attn_full = pattern[h, :t+1, :t+1].cpu().numpy()
+                    attn_full = pattern[h, :t+1, :t+1].float().cpu().numpy()
                     H_series = compute_H_series(attn_full)
                     V = compute_V(H_series)
                     C = count_collapses(H_series)
