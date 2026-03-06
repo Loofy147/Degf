@@ -74,16 +74,56 @@ def run_trt_benchmark(model=None):
 # EXP-7: Hallucination F1 Estimator
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def run_hallucination_f1():
-    # Plateau Head Archetype: G=0.275, tc < 0.4
-    # Valid Head Archetype: G=1.0, tc > 0.4 ( NM)
-    # Detection: G < 0.3 AND tc < 0.4
+def run_hallucination_f1(model=None):
+    if model is None:
+        # Simulation Mode
+        return {
+            "precision": 1.0, "recall": 1.0, "f1": 1.0, "tp": 1000, "fp": 0
+        }
+
+    # Real Mode
+    print(f"Running Hallucination F1 on {model.cfg.model_name}...")
+    monitor = DEGFMonitor(model)
+
+    # Dataset: (Prompt, Is_Hallucination)
+    cases = [
+        ("The capital of France is Paris.", False),
+        ("The capital of France is Berlin.", True),
+        ("Socrates was a philosopher.", False),
+        ("Socrates was a basketball player.", True),
+        ("2 + 2 = 4.", False),
+        ("2 + 2 = 5.", True)
+    ]
+
+    tp, fp, tn, fn = 0, 0, 0, 0
+
+    for text, is_hallu in cases:
+        g_stream = monitor.monitor_step(text)
+        # Check last substantive token (before punctuation)
+        target = g_stream[-2] if len(g_stream) > 1 else g_stream[-1]
+
+        # Detection Signature: G < 0.4 AND tc < 0.4
+        detected = target["G"] < 0.4 and target["tc"] < 0.4
+
+        if is_hallu:
+            if detected: tp += 1
+            else: fn += 1
+        else:
+            if detected: fp += 1
+            else: tn += 1
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
     return {
-        "precision": 1.0,
-        "recall": 1.0,
-        "f1": 1.0,
-        "tp": 1000,
-        "fp": 0
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "tp": tp,
+        "fp": fp,
+        "tn": tn,
+        "fn": fn
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -101,13 +141,61 @@ def run_sgs2_timing():
 # EXP-9: L_thermo Q2 Shift
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def run_thermo_shift():
+def run_thermo_shift(model=None):
+    if model is None:
+        # Simulation Mode
+        return {
+            "q2_start": 0.208, "q2_end": 0.319, "delta": 0.111, "g_start": 0.471, "g_end": 0.673
+        }
+
+    # Real Mode
+    print(f"Running Thermodynamic Shift Evaluation on {model.cfg.model_name}...")
+    from monitor_gpt2 import scan_model
+
+    corpus = ["The quick brown fox jumps over the lazy dog.", "To be or not to be, that is the question."]
+
+    # 1. Capture Baseline
+    print("  Capturing Baseline Scan...")
+    base_profiles = scan_model(model, corpus)
+    base_q2_count = len([p for p in base_profiles if p.G >= 0.5])
+    base_mean_G = np.mean([p.G for p in base_profiles])
+
+    # 2. Perform Mini-Tune (L_thermo)
+    print("  Performing Mini-Tune (L_thermo, 5 steps)...")
+    # We only tune late layers to save memory/time
+    target_layers = list(range(int(0.65 * model.cfg.n_layers), model.cfg.n_layers))
+    params_to_train = []
+    for l in target_layers:
+        for param in model.blocks[l].attn.parameters():
+            param.requires_grad = True
+            params_to_train.append(param)
+
+    optimizer = torch.optim.Adam(params_to_train, lr=1e-4)
+    tokens = model.to_tokens(corpus)
+
+    from train_thermo import compute_thermo_loss
+    model.train()
+    for i in range(5):
+        optimizer.zero_grad()
+        loss, ce, reward = compute_thermo_loss(model, tokens)
+        loss.backward()
+        optimizer.step()
+    model.eval()
+
+    # 3. Capture Post-Tune
+    print("  Capturing Post-Tune Scan...")
+    post_profiles = scan_model(model, corpus)
+    post_q2_count = len([p for p in post_profiles if p.G >= 0.5])
+    post_mean_G = np.mean([p.G for p in post_profiles])
+
+    n_total = len(base_profiles)
+
     return {
-        "q2_start": 0.208,
-        "q2_end": 0.319,
-        "delta": 0.111,
-        "g_start": 0.471,
-        "g_end": 0.673
+        "q2_start": base_q2_count / n_total,
+        "q2_end": post_q2_count / n_total,
+        "delta": (post_q2_count - base_q2_count) / n_total,
+        "g_start": base_mean_G,
+        "g_end": post_mean_G
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -145,7 +233,7 @@ if __name__ == "__main__":
     print(f"  Deductive G: {trt['mean_deductive_G']:.3f} | Inductive G: {trt['mean_inductive_G']:.3f}")
     print(f"  Gap: Δ{trt['gap']:.3f}")
 
-    hal = run_hallucination_f1()
+    hal = run_hallucination_f1(model)
     print(f"\n[EXP-7: Hallucination F1]")
     print(f"  P: {hal['precision']:.3f} | R: {hal['recall']:.3f} | F1: {hal['f1']:.3f}")
     print(f"  TP: {hal['tp']} | FP: {hal['fp']}")
@@ -154,7 +242,7 @@ if __name__ == "__main__":
     print(f"\n[EXP-8: SGS-2 Gate Timing]")
     print(f"  Deductive: {sgs['deductive']} loops | Inductive: {sgs['inductive']} loops | Math: {sgs['math']} loops")
 
-    shift = run_thermo_shift()
+    shift = run_thermo_shift(model)
     print(f"\n[EXP-9: L_thermo Q2 Shift]")
     print(f"  Q2 Density: {shift['q2_start']:.3f} -> {shift['q2_end']:.3f} (+{shift['delta']:.3f})")
     print(f"  Mean G: {shift['g_start']:.3f} -> {shift['g_end']:.3f}")
@@ -173,7 +261,7 @@ if __name__ == "__main__":
 def generate_report_card(model=None):
     """Generate a unified assessment of the model's reasoning capabilities."""
     trt = run_trt_benchmark(model)
-    hal = run_hallucination_f1()
+    hal = run_hallucination_f1(model)
     sgs = run_sgs2_timing()
 
     # Unified Reasoning Score (URS)
