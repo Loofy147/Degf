@@ -63,6 +63,18 @@ result = sgs2_model.generate(
 )
 ```
 
+### Hallucination Detection Protocol (`hallucination_protocol.py`)
+Milestone D4: Thermodynamic detection of hallucinations via the "Dog Feeding" suite.
+
+```python
+from hallucination_protocol import HallucinationProtocol, DOG_FEEDING_DATASET
+protocol = HallucinationProtocol(model)
+
+# Run F1 benchmark on factual/hallucinated prompts
+results = protocol.run_benchmark(DOG_FEEDING_DATASET)
+print(f"F1 Score: {results['f1']}")
+```
+
 ## 3. Empirical Benchmarks (`degf_v6.py`)
 
 The framework includes several benchmarks for empirical verification. Use the `--real` flag to run them against a live model.
@@ -70,8 +82,8 @@ The framework includes several benchmarks for empirical verification. Use the `-
 ### TRT Benchmark (EXP-6)
 Measures the 'G-gap' between deductive reasoning tasks and inductive pattern completion.
 
-### Hallucination F1 (EXP-7)
-Identifies hallucinations using the signature: **Low G ($<$ 0.4) + High Confidence (tc $<$ 0.4)**.
+### Hallucination F1 (EXP-7 / Milestone D4)
+Identifies hallucinations using the signature: **Low G ($<$ 0.4) + High Confidence (tc $<$ 0.4)** on the dog-feeding suite.
 
 ### Thermodynamic Shift (EXP-9)
 Measures the increase in Q2 head density after fine-tuning with the `L_thermo` loss.

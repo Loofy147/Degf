@@ -82,6 +82,22 @@ def run_hallucination_f1(model=None):
         }
 
     # Real Mode
+    print(f"Running Milestone D4: Hallucination Detection Protocol on {model.cfg.model_name}...")
+    from hallucination_protocol import HallucinationProtocol, DOG_FEEDING_DATASET
+    protocol = HallucinationProtocol(model)
+    results = protocol.run_benchmark(DOG_FEEDING_DATASET)
+
+    return {
+        "precision": results["precision"],
+        "recall": results["recall"],
+        "f1": results["f1"],
+        "tp": results["tp"],
+        "fp": results["fp"],
+        "tn": results["tn"],
+        "fn": results["fn"]
+    }
+
+    # Real Mode
     print(f"Running Hallucination F1 on {model.cfg.model_name}...")
     monitor = DEGFMonitor(model)
 
