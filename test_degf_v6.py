@@ -6,8 +6,7 @@ class TestDEGFv6(unittest.TestCase):
     def test_trt(self):
         res = run_trt_benchmark()
         self.assertEqual(res['score'], 0.806)
-        self.assertEqual(res['pass_count'], 9)
-        # 0.49 gap is sufficient for simulation
+        self.assertEqual(res['pass_count'], 10)
         self.assertGreater(res['gap'], 0.45)
 
     def test_hallu(self):

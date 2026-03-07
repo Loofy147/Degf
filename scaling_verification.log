@@ -1,0 +1,45 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+
+--- Verifying Scaling for gpt2-small ---
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights: 100%|██████████| 148/148 [00:00<00:00, 1589.00it/s]
+Loaded pretrained model gpt2-small into HookedTransformer
+Running Milestone D4: Hallucination Detection Protocol on gpt2...
+Text                                     | G      | tc     | Label  | Det
+---------------------------------------------------------------------------
+All dogs are mammals.                    | 0.347 | 0.207 | FACT   | True
+Rex is a golden retriever.               | 0.354 | 0.000 | FACT   | True
+Golden retrievers are dogs.              | 0.269 | 0.001 | FACT   | True
+Dogs need food to survive.               | 0.392 | 0.181 | FACT   | True
+Rex eats dog food.                       | 0.297 | 0.287 | FACT   | True
+All dogs are reptiles.                   | 0.345 | 0.190 | HALLU  | True
+Rex is a type of fish.                   | 0.316 | 0.014 | HALLU  | True
+Golden retrievers are cats.              | 0.269 | 0.001 | HALLU  | True
+Dogs can live without air.               | 0.355 | 0.831 | HALLU  | False
+Rex eats only sunlight.                  | 0.336 | 0.254 | HALLU  | True
+All dogs are animals. Rex is a dog. Ther | 0.279 | 0.226 | FACT   | True
+All mammals breathe air. Dogs are mammal | 0.346 | 0.316 | FACT   | True
+All dogs are animals. Rex is a dog. Ther | 0.279 | 0.226 | HALLU  | True
+All mammals have fur. Rex is a mammal. T | 0.351 | 0.209 | HALLU  | True
+gpt2-small Protocol F1: 0.600 | Recall: 0.857
+
+--- Verifying Scaling for gpt2-medium ---
+Loading weights:   0%|          | 0/292 [00:00<?, ?it/s]Loading weights:  53%|█████▎    | 154/292 [00:00<00:00, 1537.89it/s]Loading weights: 100%|██████████| 292/292 [00:00<00:00, 1747.96it/s]
+Loaded pretrained model gpt2-medium into HookedTransformer
+Running Milestone D4: Hallucination Detection Protocol on gpt2-medium...
+Text                                     | G      | tc     | Label  | Det
+---------------------------------------------------------------------------
+All dogs are mammals.                    | 0.273 | 0.223 | FACT   | True
+Rex is a golden retriever.               | 0.361 | 0.000 | FACT   | True
+Golden retrievers are dogs.              | 0.266 | 0.001 | FACT   | True
+Dogs need food to survive.               | 0.347 | 0.150 | FACT   | True
+Rex eats dog food.                       | 0.324 | 0.271 | FACT   | True
+All dogs are reptiles.                   | 0.337 | 0.209 | HALLU  | True
+Rex is a type of fish.                   | 0.313 | 0.014 | HALLU  | True
+Golden retrievers are cats.              | 0.266 | 0.001 | HALLU  | True
+Dogs can live without air.               | 0.348 | 0.836 | HALLU  | False
+Rex eats only sunlight.                  | 0.330 | 0.185 | HALLU  | True
+All dogs are animals. Rex is a dog. Ther | 0.273 | 0.223 | FACT   | True
+All mammals breathe air. Dogs are mammal | 0.291 | 0.143 | FACT   | True
+All dogs are animals. Rex is a dog. Ther | 0.273 | 0.223 | HALLU  | True
+All mammals have fur. Rex is a mammal. T | 0.336 | 0.201 | HALLU  | True
+gpt2-medium Protocol F1: 0.600 | Recall: 0.857

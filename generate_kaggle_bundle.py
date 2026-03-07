@@ -4,7 +4,7 @@ def get_file_content(path):
     with open(path, "r") as f:
         return f.read()
 
-files = ["degf_core.py", "monitor_gpt2.py", "degf_v6.py"]
+files = ["degf_core.py", "monitor_gpt2.py", "degf_v6.py", "sgs2_prototype.py", "train_thermo.py", "ablation_a3.py", "hallucination_protocol.py"]
 
 setup_code = "import os\n"
 for f in files:

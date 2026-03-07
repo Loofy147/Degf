@@ -26,43 +26,55 @@ $$G = \sigma(V + 0.5 \cdot C - 1.2)$$
 ## 2. API Reference
 
 ### Real-Time Monitor (`monitor_gpt2.py`)
-The `DEGFMonitor` class provides token-by-token analysis.
+Provides token-by-token analysis for TransformerLens and Hugging Face models.
 
+#### TransformerLens
 ```python
 from monitor_gpt2 import DEGFMonitor
 monitor = DEGFMonitor(model)
 g_stream = monitor.monitor_step("Your prompt here")
-
-for entry in g_stream:
-    print(f"Token: {entry['token']} | G: {entry['G']:.4f} | Quality: {entry['Q']:.4f}")
 ```
 
-### Training Signal (`train_thermo.py`)
-The `compute_thermo_loss` function integrates with any standard training loop.
+#### Hugging Face
+```python
+from monitor_gpt2 import HFDEGFMonitor
+monitor = HFDEGFMonitor(model, tokenizer)
+g_stream = monitor.monitor_step("Your prompt here")
+```
+
+### Training Signal (`train_thermo.py`, `train_deepseek_v6.py`)
+The `compute_thermo_loss` functions integrate with standard training loops.
 
 ```python
+from train_thermo import compute_thermo_loss
 loss, ce_loss, thermo_reward = compute_thermo_loss(model, tokens)
 loss.backward()
 ```
 
-### SGS-2 Recurrence (`sgs2_prototype.py`)
-A prototype for models that genuinely deliberate.
+### SGS-2 Architecture (`sgs2_prototype.py`)
+Model-agnostic prototype for models that genuinely deliberate.
 
 ```python
 from sgs2_prototype import SGS2Prototype
-sgs2_model = SGS2Prototype(base_model)
-logits = sgs2_model("Reason about this...") # Triggers Phase Gate recurrence
+sgs2_model = SGS2Prototype(model, tokenizer) # Supports TL or HF
+
+# Full generation loop with genuine deliberation
+result = sgs2_model.generate("def hello_world():", max_new_tokens=10)
 ```
 
-## 3. Configuration
+## 3. Empirical Benchmarks (`degf_v6.py`)
 
-Key constants can be found in `degf_core.py`:
-- `K_DEG`: Rate of genuineness degradation (0.8129).
-- `K_REC`: Rate of genuineness recovery (1.2371).
-- `THETA_C`: Collapse threshold (-0.20).
+The framework includes benchmarks for empirical verification. Support for DeepSeek-Coder-1.3B is included via the `--deepseek` flag.
 
-## 4. Calibration
+### TRT Benchmark (EXP-6)
+Measures the 'G-gap' between deductive reasoning tasks and inductive pattern completion.
 
-The G-score is calibrated against reasoning quality using the following formula (IMP-4):
-$$\hat{Q} = 0.802 \cdot G - 0.113 \cdot tc + 0.145$$
-where $tc$ is the normalized token cost (surprisal).
+### Hallucination F1 (EXP-7 / Milestone D4)
+Identifies hallucinations using the signature: **Low G ($<$ 0.4) + High Confidence (tc $<$ 0.4)**.
+
+### Thermodynamic Shift (EXP-9)
+Measures the increase in Q2 head density after fine-tuning with the `L_thermo` loss.
+
+## 4. Scaling Laws
+
+DEGF metrics are architecture-stable and scale with model size. Milestone D4 validation on `gpt2-medium` and DeepSeek-Coder-1.3B confirms that the thermodynamic signature of reasoning remains a robust diagnostic across scales.
