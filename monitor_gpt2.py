@@ -193,3 +193,65 @@ if __name__ == "__main__":
     print("-" * 40)
     for entry in g_stream:
         print(f"{entry['token']:<15} | {entry['G']:.4f} | {entry['Q']:.4f}")
+
+class HFDEGFMonitor:
+    """DEGF Monitor for Hugging Face Transformers models."""
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.n_layers = model.config.num_hidden_layers
+        self.n_heads = model.config.num_attention_heads
+
+    def compute_quality(self, G, tc):
+        return 0.802 * G - 0.113 * tc + 0.145
+
+    def monitor_step(self, text):
+        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            outputs = self.model(**inputs, output_attentions=True)
+            logits = outputs.logits
+            attentions = outputs.attentions # tuple of (batch, head, query, key)
+
+            if logits.ndim == 3:
+                logits = logits[0]
+
+            seq_len = inputs["input_ids"].shape[1]
+            g_stream = []
+
+            log_probs = logits.log_softmax(dim=-1)
+            labels = inputs["input_ids"][0, 1:]
+            token_log_probs = log_probs[:-1, :].gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+            surprisals = -token_log_probs / np.log(2)
+            tc_normalized = torch.clamp(surprisals.float() / 10.0, 0, 1).cpu().numpy()
+
+            for t in range(seq_len):
+                token_str = self.tokenizer.decode(inputs["input_ids"][0, t])
+                tc = float(tc_normalized[t-1]) if t > 0 else 0.5
+
+                all_G = []
+                for l in range(self.n_layers):
+                    pattern = attentions[l][0] # (head, query, key)
+                    use_detrended = (l < int(0.65 * self.n_layers))
+                    for h in range(self.n_heads):
+                        attn_full = pattern[h, :t+1, :t+1].float().cpu().numpy()
+                        # Normalize to avoid numerical instability
+                        attn_full = attn_full / (attn_full.sum(axis=-1, keepdims=True) + 1e-12)
+                        H_series = compute_H_series(attn_full)
+                        V = compute_V_detrended(H_series) if use_detrended else compute_V(H_series)
+                        C = count_collapses(H_series)
+                        G = compute_G(V, C)
+                        all_G.append(G)
+
+                mean_G = float(np.mean(all_G))
+                quality = self.compute_quality(mean_G, tc)
+                hallucination_risk = "HIGH" if mean_G < 0.3 and tc < 0.3 else "LOW"
+
+                g_stream.append({
+                    "token": token_str,
+                    "G": mean_G,
+                    "tc": tc,
+                    "Q": quality,
+                    "hallucination_risk": hallucination_risk
+                })
+
+            return g_stream
