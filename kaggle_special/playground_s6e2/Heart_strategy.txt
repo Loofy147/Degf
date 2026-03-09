@@ -18,3 +18,10 @@ The goal was to demonstrate the effectiveness of combining a standard ML baselin
 - `heart_disease_reasoner.py`: Implementation of the logic overlay.
 - `refine_submission.py`: Script to generate the final submission using the reasoner.
 - `submission_refined.csv`: Final competition entry.
+
+## Elite Upgrade (Omni-Tabular V7)
+Reconstructed the high-performing V6 patterns:
+1. **High-Order Interactions**: Created `Thal_Vess_Chest` and `ST_Slope_Sex` to capture extremely pure decision nodes discovered in EDA.
+2. **Medical Grounding**: Integrated biological ratios like HR/BP.
+3. **Ensemble Architecture**: Used tuned XGBoost for high-resolution decision boundaries.
+4. **Result**: Public Score 0.88346.

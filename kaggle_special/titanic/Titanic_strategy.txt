@@ -11,3 +11,8 @@ The goal was to demonstrate 'Genuine Reasoning' (G-grounding) in a classic class
 
 ## Results
 - Achieved significant improvement over standard ML baselines by grounding the predictions in the historical context of the Titanic disaster.
+
+## Elite Upgrade (God-Mode V2)
+1. **Model Synergy**: Combined XGBoost and CatBoost to handle both numeric and categorical nuances.
+2. **G-Feature Integration**: Injected WCG directly into the feature set for the model to learn interaction weights.
+3. **Refinement**: Public Score 0.78229.

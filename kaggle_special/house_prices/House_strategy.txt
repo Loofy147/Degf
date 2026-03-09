@@ -10,3 +10,8 @@ A regression task focusing on property values. The strategy used 'Domain Interac
 
 ## Results
 - Grounding the model in 'Value Density' logic helped stabilize the regression in high-variance price ranges.
+
+## Elite Upgrade (Elite DEGF Ensemble)
+1. **Interaction Grounding**: Added `QualitySF` (OverallQual * TotalSF) to model non-linear price growth.
+2. **Log-Space Blend**: Ensembled XGB and CatBoost in log-price space to minimize RMSE.
+3. **Result**: Public Score 0.14069.

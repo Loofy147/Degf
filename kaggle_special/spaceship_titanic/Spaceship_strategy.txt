@@ -10,3 +10,8 @@ This competition involved identifying which passengers were transported to anoth
 
 ## Results
 - The deterministic 'Expenditure' logic served as a G-grounded anchor, improving the quality of inputs to the machine learning model.
+
+## Elite Upgrade (Mega-Logic V2)
+1. **Group Imputation**: Used GroupID consistency to recover missing HomePlanet and Destination values.
+2. **Ensemble Support**: XGB+CAT ensemble for robust cross-feature reasoning.
+3. **Result**: Re-stabilized performance across ship-wide technical dependencies.
