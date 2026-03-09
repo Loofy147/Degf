@@ -45,3 +45,8 @@ python3 monitor_gpt2.py
 ```bash
 python3 sgs2_prototype.py
 ```
+
+## Track D — APEX Unified Orchestrator
+- **16-Layer Synthesis**: Comprehensive processing from raw signal detection to MCDA ranking.
+- **DEGF Grounding**: Hyperparameter tuning grounded in internal genuineness metrics to prevent "gaming".
+- **Self-Healing**: Autonomous engine optimization based on meta-G self-assessment.

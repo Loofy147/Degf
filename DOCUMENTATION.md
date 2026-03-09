@@ -78,3 +78,39 @@ Measures the increase in Q2 head density after fine-tuning with the `L_thermo` l
 ## 4. Scaling Laws
 
 DEGF metrics are architecture-stable and scale with model size. Milestone D4 validation on `gpt2-medium` and DeepSeek-Coder-1.3B confirms that the thermodynamic signature of reasoning remains a robust diagnostic across scales.
+
+## 5. APEX Integrated System (v2.0)
+
+APEX is a unified orchestrator that integrates DEGF metrics with 16 layers of signal processing, synthesis, and mathematical discovery.
+
+### Architecture Overview (`apex_v2.py`)
+- **Signal Detection**: Winsorized-SNR, Hurst exponent, Spectral Entropy, and Isolation Forest anomalies.
+- **Synthesis Engine**: 6 methods including `UltraSynthesisV3` with diversity injection.
+- **Extensive Tuning Engine**: Regime-aware hyperparameter optimization grounded in DEGF G-scores (`extensive_tuning_v3.py`).
+- **Meta-Monitoring**: Level-3 self-application of DEGF to the engine's own computation stream.
+
+### Key Components
+
+#### ExtensiveTuningEngine (`extensive_tuning_v3.py`)
+Robust optimization that balances performance (Q-score) and structural genuineness (G-score).
+- **Anti-Gaming Guard**: Penalizes parameter sets that produce trivially perfect but non-genuine results.
+- **Regime Fingerprinting**: Automatically selects tuning grids based on signal characteristics (Trending, Periodic, Stochastic).
+
+#### SelfHealLoop
+Automatically triggers the `SelfOptimizer` when `meta_G` drops below 0.50, ensuring the engine maintains high-quality synthesis.
+
+### Usage
+```python
+from apex_v2 import APEX, ResearchDataset
+apex = APEX()
+report = apex.run(ResearchDataset("MyData", series))
+```
+
+## 6. Mathematical Foundations (`advanced_modules.py`)
+
+DEGF grounding allows the discovery engine to handle advanced mathematical domains with high reliability.
+
+- **MELNIKOV**: Hamiltonian chaos detection via homoclinic/heteroclinic analysis.
+- **SLOWFAST**: Fenichel theory and Canard explosion analysis for singularly perturbed systems.
+- **DDE**: Hopf bifurcation and multi-stability analysis for delay differential equations.
+- **PDE_RD**: Turing instability and energy functional analysis for reaction-diffusion systems.
