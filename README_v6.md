@@ -1,11 +1,14 @@
-# DEGF v6
+# DEGF v6 — Enhanced Thermodynamic Grounding
 
-Latest version with:
-- TRT Reasoning Benchmark
-- Hallucination F1 (Plateau Head)
-- SGS-2 Gate Timing
-- L_thermo Q2 Shift
-- Kaggle GPU Integration
-- k Scaling Laws
+This version introduces the **Extensive Tuning Engine (v3.0)** and **APEX v2.0 Integration**, aligning hyperparameter optimization with the Dynamic Entropy Genuineness Framework.
 
-All repository bugs patched.
+## Key Updates
+- **G-Grounded Tuning**: Optimization is now guided by structural genuineness (G-score), not just performance (Q-score).
+- **Anti-Gaming Guards**: Robust protection against overfitting and metric-gaming.
+- **Unified Registry**: Persistent storage for adaptive weights and engine metadata.
+
+## Run Enhanced Suite
+```bash
+# Run APEX v2.0 full pipeline
+python3 apex_v2.py
+```
