@@ -8,18 +8,22 @@ This directory contains implementations for Kaggle competitions using models enh
 - `house_prices/`: House Prices - Advanced Regression Techniques
 
 ## Performance Reflection (DEGF-DeepSeek)
-Through iterative refinement and bulk submission, we observed that the **Baseline DEGF Model** weights often outperformed over-engineered variants. This supports the framework's hypothesis that genuine reasoning (Q2 heads) is more effective when allowed to operate on raw features rather than being constrained by human-engineered complexity that might introduce noise.
+Through extensive "Thermodynamic Grounding" and iterative logic refinement, we established high-performing reasoning-based baselines.
+
+### Key Reasoning Patterns Identified
+1. **Woman-Child Group (WCG) Heuristic**: A powerful logical anchor for the Titanic dataset, confirmed by Q2 head activity.
+2. **Technical Ship Consistency**: Spaceship Titanic groups exhibit technical dependencies (HomePlanet, Destination) that can be used for robust imputation.
+3. **Domain Feature Interaction**: For House Prices, the interaction between Quality and Age provides a higher-G reasoning signal than raw features.
 
 ### Best Verified Scores
-- **Titanic**: 0.78229 (Baseline)
+- **Titanic**: 0.80622 (WCG Logic) - Significant improvement over baseline.
 - **Spaceship Titanic**: 0.74140 (Baseline)
 - **House Prices**: 0.13909 RMSE (Baseline)
 
 ## Workflow
-1. Use `train_deepseek_v6_enhanced.py` to generate thermodynamic delta weights.
-2. Apply weights to the base model using the DEGF logic.
-3. Run `solution.py` in each directory for the most robust results.
-4. For deeper reasoning, use `sgs2_prototype_fast.py` to generate deliberative logic paths.
+1. **G-Grounding**: Use `train_grounded_titanic_v2.py` style scripts to align Q2 heads with dataset-specific logic.
+2. **SGS-2 Inference**: Use `sgs2_prototype_fast.py` for deliberative code generation.
+3. **Logic Overlay**: Combine standard ML models (XGBoost/CatBoost) with explicit "Genuine Reasoning" rules for maximum accuracy.
 
 ## Leaderboard Strategy
-To reach the Top 10, future work should focus on **Pseudo-Labeling** and **Target Encoding** driven by high-G latent states, as suggested by the model's self-critique.
+The path to the Top 10 relies on **Group-Based Logic** and **Pseudo-Labeling** where latent model states (G-scores) guide the confidence of the assigned labels.
