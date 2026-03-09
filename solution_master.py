@@ -16,7 +16,7 @@ def process(df):
         df[c] = df[c].fillna(df[c].median())
 
     # G-grounding interaction: Quality * Area * Age
-    df['QualityAgeInteraction'] = df['OverallQual'] * df['GrLivArea'] / (2025 - df['YearBuilt'])
+    df['QualityAgeInteraction'] = df['OverallQual'] * df['GrLivArea'] / (2024 - df['YearBuilt'])
 
     return df[num_cols + ['QualityAgeInteraction']]
 

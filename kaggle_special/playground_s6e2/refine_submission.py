@@ -24,10 +24,10 @@ def main():
     print("\nApplying reasoning to test predictions...")
     test_refined_proba = apply_reasoning(test, test_baseline_proba)
 
-    # Save refined submission
-    submission = pd.DataFrame({'id': test.id, 'Heart Disease': np.where(test_refined_proba > 0.5, 'Presence', 'Absence')})
+    # Save refined submission (Binary Format matching sample_submission)
+    submission = pd.DataFrame({'id': test.id, 'Heart Disease': (test_refined_proba > 0.5).astype(int)})
     submission.to_csv('kaggle_special/playground_s6e2/submission_refined.csv', index=False)
-    print("Refined submission saved to kaggle_special/playground_s6e2/submission_refined.csv")
+    print("Refined binary submission saved to kaggle_special/playground_s6e2/submission_refined.csv")
 
 if __name__ == "__main__":
     main()

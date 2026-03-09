@@ -1,0 +1,12 @@
+# House Prices - DEGF Reasoning Strategy
+
+## Overview
+A regression task focusing on property values. The strategy used 'Domain Interaction' grounding to identify reasoning signals that transcend raw feature correlations.
+
+## Process
+1. **Domain Anchor**: Identified that the interaction between Quality, Area, and Age provides a higher-G reasoning signal than individual features.
+2. **G-Interaction**: Engineered a 'QualityAgeInteraction' feature: (OverallQual * GrLivArea) / Age. This represents the 'Value Density' of a property over time.
+3. **ML Pipeline**: Used an XGBoost regressor trained on log-transformed targets to handle the skewness of house prices.
+
+## Results
+- Grounding the model in 'Value Density' logic helped stabilize the regression in high-variance price ranges.

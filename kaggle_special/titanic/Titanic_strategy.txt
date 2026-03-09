@@ -1,0 +1,13 @@
+# Titanic - DEGF Reasoning Strategy
+
+## Overview
+The goal was to demonstrate 'Genuine Reasoning' (G-grounding) in a classic classification task by using logical anchors that standard models might miss or under-weight.
+
+## Process
+1. **WCG Logic Identification**: Identified the Woman-Child Group (WCG) heuristic as a powerful reasoning signal.
+2. **ML Baseline**: Trained an XGBoost model on standard features (Pclass, Sex, Age, Fare).
+3. **Logic Overlay**: Refined predictions by examining groups (Families/Tickets). If a Woman or Child in a group died, others in that group are more likely to have died. If a Male in a group lived, others are more likely to have lived.
+4. **Refinement**: Overlaid these logical conclusions onto the ML baseline to fix 'uncertain' predictions where the group context provided a decisive reasoning signal.
+
+## Results
+- Achieved significant improvement over standard ML baselines by grounding the predictions in the historical context of the Titanic disaster.
