@@ -1,0 +1,17 @@
+# Spaceship Titanic - DEGF Reasoning Strategy
+
+## Overview
+This competition involved identifying which passengers were transported to another dimension. The strategy focused on 'Technical Grounding' - identifying physical constraints of the ship and group behaviors.
+
+## Process
+1. **Expenditure Logic**: People in CryoSleep cannot spend money on amenities (Spa, VRDeck, etc.). This provided a deterministic logical anchor for imputing missing CryoSleep values.
+2. **Group Dynamics**: Passengers in the same 'Group' (derived from PassengerId) often share the same HomePlanet, Destination, and Cabin features.
+3. **ML Model**: Used a RandomForest with deep trees to capture these reasoning paths and interactions between technical status (CryoSleep) and group context.
+
+## Results
+- The deterministic 'Expenditure' logic served as a G-grounded anchor, improving the quality of inputs to the machine learning model.
+
+## Elite Upgrade (Mega-Logic V2)
+1. **Group Imputation**: Used GroupID consistency to recover missing HomePlanet and Destination values.
+2. **Ensemble Support**: XGB+CAT ensemble for robust cross-feature reasoning.
+3. **Result**: Re-stabilized performance across ship-wide technical dependencies.
